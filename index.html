@@ -2,116 +2,182 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#07060d">
 <title>Neon Alley Brawl — Beat 'Em Up Prototype</title>
 <style>
   /* ---------- Page + responsive 16:9 stage ---------- */
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; background: #07060d; overflow: hidden; }
+  /* --vh is the *visible* viewport height (dvh where supported, so mobile URL bars
+     do not crop the game); --sw is the width of the 16:9 play field. */
+  :root { --vh: 1vh; --sw: min(100vw, calc(177.78 * var(--vh))); }
+  @supports (height: 1dvh) { :root { --vh: 1dvh; } }
+  html, body { width: 100%; height: 100%; background: #07060d; overflow: hidden;
+               touch-action: none; overscroll-behavior: none;
+               -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   body { display: flex; align-items: center; justify-content: center;
          font-family: "Trebuchet MS", "Segoe UI", Verdana, sans-serif; color: #fff; user-select: none; }
-  #stage { position: relative; width: min(100vw, 177.78vh); height: min(100vh, 56.25vw);
-           container-type: size; overflow: hidden; background: #000; }
+  /* --u is the unit every HUD/menu size is written in: 1% of the play-field width. */
+  #stage { position: relative; width: var(--sw); height: calc(var(--sw) * .5625);
+           container-type: size; --u: 1cqw; overflow: hidden; background: #000; }
+  #view { position: absolute; inset: 0; }
   canvas { display: block; width: 100%; height: 100%; }
 
   /* ---------- HUD (all sizes in cqw so they scale with the stage) ---------- */
   #hud { position: absolute; inset: 0; pointer-events: none; font-weight: 800; letter-spacing: .08em;
-         text-shadow: 0 .25cqw 0 #000; }
+         text-shadow: 0 calc(.25 * var(--u)) 0 #000; }
   #hud.hidden { display: none; }
-  .panel { position: absolute; top: 2.2cqw; font-size: 1.6cqw; }
-  #pPanel { left: 2.5cqw; }
-  #wPanel { right: 2.5cqw; text-align: right; }
+  .panel { position: absolute; top: calc(2.2 * var(--u)); font-size: calc(1.6 * var(--u)); }
+  #pPanel { left: calc(2.5 * var(--u)); }
+  #wPanel { right: calc(2.5 * var(--u)); text-align: right; }
   .name { color: #ffd166; }
-  #hpBar { position: relative; width: 30cqw; height: 2.1cqw; margin-top: .5cqw; background: #2a1320;
-           border: .3cqw solid #fff; transform: skewX(-18deg); overflow: hidden; }
+  #hpBar { position: relative; width: calc(30 * var(--u)); height: calc(2.1 * var(--u)); margin-top: calc(.5 * var(--u)); background: #2a1320;
+           border: calc(.3 * var(--u)) solid #fff; transform: skewX(-18deg); overflow: hidden; }
   #hpGhost, #hpFill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; }
   #hpGhost { background: #fff; transition: width .5s ease-out .25s; }
   #hpFill  { background: linear-gradient(#ffe45e, #ff9f1c 55%, #e85d04); transition: width .08s linear; }
   #hpFill.low { background: linear-gradient(#ff6b6b, #c1121f); }
-  #score { margin-top: .6cqw; font-size: 1.4cqw; color: #cfe8ff; }
+  #score { margin-top: calc(.6 * var(--u)); font-size: calc(1.4 * var(--u)); color: #cfe8ff; }
   #wave { color: #7cf5ff; }
-  #enemies { margin-top: .4cqw; font-size: 1.4cqw; color: #ff8fab; }
-  #diff { margin-top: .4cqw; font-size: 1.2cqw; color: #ffd166; }
+  #enemies { margin-top: calc(.4 * var(--u)); font-size: calc(1.4 * var(--u)); color: #ff8fab; }
+  #diff { margin-top: calc(.4 * var(--u)); font-size: calc(1.2 * var(--u)); color: #ffd166; }
   /* Boss health bar (top centre, only during the boss fight) */
-  #bossHud { position: absolute; top: 2.2cqw; left: 50%; width: 32cqw; transform: translateX(-50%);
-             display: none; text-align: center; font-size: 1.5cqw; }
+  #bossHud { position: absolute; top: calc(2.2 * var(--u)); left: 50%; width: calc(32 * var(--u)); transform: translateX(-50%);
+             display: none; text-align: center; font-size: calc(1.5 * var(--u)); }
   #bossHud.show { display: block; }
   #bossName { color: #ff4d6d; }
-  #bossName span { color: #ffe45e; margin-left: .8cqw; display: none; animation: blink .25s steps(2) infinite; }
+  #bossName span { color: #ffe45e; margin-left: calc(.8 * var(--u)); display: none; animation: blink .25s steps(2) infinite; }
   #bossHud.rage #bossName span { display: inline; }
-  #bossBar { position: relative; height: 1.7cqw; margin-top: .4cqw; background: #1a0010; border: .3cqw solid #fff;
-             overflow: hidden; box-shadow: 0 0 1.2cqw rgba(255,45,85,.6); }
+  #bossBar { position: relative; height: calc(1.7 * var(--u)); margin-top: calc(.4 * var(--u)); background: #1a0010; border: calc(.3 * var(--u)) solid #fff;
+             overflow: hidden; box-shadow: 0 0 calc(1.2 * var(--u)) rgba(255,45,85,.6); }
   #bossGhost, #bossFill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; }
   #bossGhost { background: #ffd6e0; transition: width .6s ease-out .3s; }
   #bossFill  { background: linear-gradient(#c77dff, #7b2cbf 60%, #3c096c); transition: width .08s linear; }
   #bossHud.rage #bossFill { background: linear-gradient(#ff6b6b, #d00000 60%, #6a040f); animation: rageBar .16s steps(2) infinite; }
   @keyframes rageBar { 50% { filter: brightness(1.8); } }
   /* End-of-run stats */
-  #ovStats { display: none; grid-template-columns: auto auto; gap: .5cqw 3cqw; font-size: 2cqw; text-align: left; }
+  #ovStats { display: none; grid-template-columns: auto auto; gap: calc(.5 * var(--u)) calc(3 * var(--u)); font-size: calc(2 * var(--u)); text-align: left; }
   #ovStats.show { display: grid; }
   #ovStats b { color: #7cf5ff; }
   #ovStats span:nth-child(even) { color: #ffe45e; text-align: right; }
-  #ovTitle.small { font-size: 5.2cqw; }
+  #ovTitle.small { font-size: calc(5.2 * var(--u)); }
   /* Weapon HUD + pick-up cue */
-  #weapon { margin-top: .5cqw; font-size: 1.3cqw; color: #7cf5ff; display: none; }
+  #weapon { margin-top: calc(.5 * var(--u)); font-size: calc(1.3 * var(--u)); color: #7cf5ff; display: none; }
   #weapon.show { display: block; }
   #weapon.low { color: #ff6b6b; }
-  #prompt { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); display: none; font-size: 1.9cqw;
-            padding: .5cqw 1.6cqw; color: #ffe45e; background: rgba(10,0,25,.75); border: .25cqw solid #ffe45e;
-            border-radius: .6cqw; white-space: nowrap; }
+  #prompt { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); display: none; font-size: calc(1.9 * var(--u));
+            padding: calc(.5 * var(--u)) calc(1.6 * var(--u)); color: #ffe45e; background: rgba(10,0,25,.75); border: calc(.25 * var(--u)) solid #ffe45e;
+            border-radius: calc(.6 * var(--u)); white-space: nowrap; }
   #prompt.show { display: block; }
   /* Name entry + neon leaderboard */
-  #ovRow { display: flex; align-items: center; justify-content: center; gap: 4cqw; }
-  #nameEntry { display: none; align-items: center; gap: 1.5cqw; font-size: 2cqw; font-weight: 900; letter-spacing: .15em;
-               color: #7cf5ff; text-shadow: 0 0 .8cqw #00e5ff; }
+  #ovRow { display: flex; align-items: center; justify-content: center; gap: calc(4 * var(--u)); }
+  #nameEntry { display: none; align-items: center; gap: calc(1.5 * var(--u)); font-size: calc(2 * var(--u)); font-weight: 900; letter-spacing: .15em;
+               color: #7cf5ff; text-shadow: 0 0 calc(.8 * var(--u)) #00e5ff; }
   #nameEntry.show { display: flex; }
-  #nameInput { width: 10cqw; font: 900 3.4cqw "Courier New", monospace; text-align: center; letter-spacing: .3em;
-               text-transform: uppercase; color: #ffe45e; background: #12002a; border: .3cqw solid #ff2bd6;
-               box-shadow: 0 0 1.2cqw #ff2bd6, inset 0 0 .8cqw rgba(255,43,214,.4); outline: none; caret-color: #7cf5ff;
-               padding: .3cqw 0 .3cqw .3em; user-select: text; -webkit-user-select: text; }
-  #board { padding: 1cqw 1.8cqw 1.2cqw; border: .25cqw solid #ff2bd6; border-radius: .8cqw; background: rgba(10,0,25,.65);
-           box-shadow: 0 0 1.4cqw #ff2bd6, inset 0 0 1.4cqw rgba(255,43,214,.3);
+  #nameInput { width: calc(10 * var(--u)); font: 900 calc(3.4 * var(--u)) "Courier New", monospace; text-align: center; letter-spacing: .3em;
+               text-transform: uppercase; color: #ffe45e; background: #12002a; border: calc(.3 * var(--u)) solid #ff2bd6;
+               box-shadow: 0 0 calc(1.2 * var(--u)) #ff2bd6, inset 0 0 calc(.8 * var(--u)) rgba(255,43,214,.4); outline: none; caret-color: #7cf5ff;
+               padding: calc(.3 * var(--u)) 0 calc(.3 * var(--u)) .3em; user-select: text; -webkit-user-select: text; }
+  #board { padding: calc(1 * var(--u)) calc(1.8 * var(--u)) calc(1.2 * var(--u)); border: calc(.25 * var(--u)) solid #ff2bd6; border-radius: calc(.8 * var(--u)); background: rgba(10,0,25,.65);
+           box-shadow: 0 0 calc(1.4 * var(--u)) #ff2bd6, inset 0 0 calc(1.4 * var(--u)) rgba(255,43,214,.3);
            font-family: "Courier New", monospace; font-weight: 900; }
-  #board h3 { font-size: 1.7cqw; letter-spacing: .2em; margin-bottom: .5cqw; color: #7cf5ff; text-shadow: 0 0 .9cqw #00e5ff; }
-  #board .row { display: grid; grid-template-columns: 2cqw 4.6cqw 7.6cqw 5.4cqw 7cqw; column-gap: 1cqw; text-align: right;
-                font-size: 1.55cqw; line-height: 1.5; color: #ffe45e; text-shadow: 0 0 .7cqw rgba(255,228,94,.75); }
-  #board .row span:nth-child(2) { text-align: left; color: #fff; text-shadow: 0 0 .7cqw #ff2bd6; }
-  #board .row.head { font-size: 1.05cqw; color: #ff8fab; text-shadow: none; }
-  #board .row.new, #board .row.new span:nth-child(2) { color: #7cff6b; text-shadow: 0 0 .8cqw #7cff6b; }
+  #board h3 { font-size: calc(1.7 * var(--u)); letter-spacing: .2em; margin-bottom: calc(.5 * var(--u)); color: #7cf5ff; text-shadow: 0 0 calc(.9 * var(--u)) #00e5ff; }
+  #board .row { display: grid; grid-template-columns: calc(2 * var(--u)) calc(4.6 * var(--u)) calc(7.6 * var(--u)) calc(5.4 * var(--u)) calc(7 * var(--u)); column-gap: calc(1 * var(--u)); text-align: right;
+                font-size: calc(1.55 * var(--u)); line-height: 1.5; color: #ffe45e; text-shadow: 0 0 calc(.7 * var(--u)) rgba(255,228,94,.75); }
+  #board .row span:nth-child(2) { text-align: left; color: #fff; text-shadow: 0 0 calc(.7 * var(--u)) #ff2bd6; }
+  #board .row.head { font-size: calc(1.05 * var(--u)); color: #ff8fab; text-shadow: none; }
+  #board .row.new, #board .row.new span:nth-child(2) { color: #7cff6b; text-shadow: 0 0 calc(.8 * var(--u)) #7cff6b; }
   #board .row.new { animation: blink .45s steps(2) infinite; }
-  #board .note { margin-top: .5cqw; font-size: 1cqw; color: #ff8fab; }
-  #combo { position: absolute; right: 4cqw; top: 22%; text-align: right; font-style: italic; opacity: 0;
+  #board .note { margin-top: calc(.5 * var(--u)); font-size: calc(1 * var(--u)); color: #ff8fab; }
+  #combo { position: absolute; right: calc(4 * var(--u)); top: 22%; text-align: right; font-style: italic; opacity: 0;
            transition: opacity .25s; }
   #combo.show { opacity: 1; }
-  #comboNum { font-size: 6.5cqw; line-height: 1; color: #ffe45e; -webkit-text-stroke: .25cqw #c1121f;
+  #comboNum { font-size: calc(6.5 * var(--u)); line-height: 1; color: #ffe45e; -webkit-text-stroke: calc(.25 * var(--u)) #c1121f;
               display: inline-block; }
   #comboNum.pop { animation: pop .18s ease-out; }
-  #combo small { display: block; font-size: 1.8cqw; color: #fff; }
+  #combo small { display: block; font-size: calc(1.8 * var(--u)); color: #fff; }
   @keyframes pop { 0% { transform: scale(1.7) rotate(-6deg); } 100% { transform: scale(1) rotate(0); } }
-  #go { position: absolute; right: 4cqw; top: 42%; font-size: 4.2cqw; font-style: italic; color: #7cff6b;
-        -webkit-text-stroke: .2cqw #063; display: none; animation: blink .5s steps(2) infinite; }
+  #go { position: absolute; right: calc(4 * var(--u)); top: 42%; font-size: calc(4.2 * var(--u)); font-style: italic; color: #7cff6b;
+        -webkit-text-stroke: calc(.2 * var(--u)) #063; display: none; animation: blink .5s steps(2) infinite; }
   #go.show { display: block; }
   @keyframes blink { 50% { opacity: .15; } }
 
   /* ---------- Start / pause / end overlay ---------- */
   #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
-             justify-content: center; gap: 1.3cqw; text-align: center;
+             justify-content: center; gap: calc(1.3 * var(--u)); text-align: center;
              background: radial-gradient(ellipse at center, rgba(40,10,60,.82), rgba(4,2,10,.95)); }
   #overlay.hidden { display: none; }
-  #ovTitle { font-size: 6.2cqw; font-style: italic; font-weight: 900; letter-spacing: .04em; color: #ffe45e;
-             -webkit-text-stroke: .3cqw #c1121f; text-shadow: .5cqw .5cqw 0 #3a0ca3; }
-  #ovSub { font-size: 1.9cqw; color: #cfe8ff; white-space: pre-line; line-height: 1.5; }
-  #keys { display: grid; grid-template-columns: auto auto; gap: .5cqw 2cqw; font-size: 1.6cqw; text-align: left; }
-  #keys b { color: #7cf5ff; }
-  #startBtn { pointer-events: auto; cursor: pointer; font: inherit; font-size: 2.6cqw; font-weight: 900;
-              letter-spacing: .1em; padding: 1.1cqw 4cqw; color: #1a0b2e; background: #ffe45e;
-              border: .35cqw solid #fff; box-shadow: 0 .6cqw 0 #c1121f; transform: skewX(-10deg); }
+  #ovTitle { font-size: calc(6.2 * var(--u)); font-style: italic; font-weight: 900; letter-spacing: .04em; color: #ffe45e;
+             -webkit-text-stroke: calc(.3 * var(--u)) #c1121f; text-shadow: calc(.5 * var(--u)) calc(.5 * var(--u)) 0 #3a0ca3; }
+  #ovSub { font-size: calc(1.9 * var(--u)); color: #cfe8ff; white-space: pre-line; line-height: 1.5; }
+  #keys, #keysTouch { display: grid; grid-template-columns: auto auto; gap: calc(.5 * var(--u)) calc(2 * var(--u)); font-size: calc(1.6 * var(--u)); text-align: left; }
+  #keys b, #keysTouch b { color: #7cf5ff; }
+  #keysTouch { display: none; }
+  #startBtn { pointer-events: auto; cursor: pointer; font: inherit; font-size: calc(2.6 * var(--u)); font-weight: 900;
+              letter-spacing: .1em; padding: calc(1.1 * var(--u)) calc(4 * var(--u)); color: #1a0b2e; background: #ffe45e;
+              border: calc(.35 * var(--u)) solid #fff; box-shadow: 0 calc(.6 * var(--u)) 0 #c1121f; transform: skewX(-10deg); }
   #startBtn:hover { background: #fff; }
-  #startBtn:active { transform: skewX(-10deg) translateY(.4cqw); box-shadow: 0 .2cqw 0 #c1121f; }
+  #startBtn:active { transform: skewX(-10deg) translateY(calc(.4 * var(--u))); box-shadow: 0 calc(.2 * var(--u)) 0 #c1121f; }
+
+  /* ---------- Touch / phone layout (body.touch is set by TouchPad) ----------
+     The stage fills the whole screen; the 16:9 play field (#view) sits at the top,
+     centred. Landscape: controls float over the lower corners. Portrait: the play
+     field is the top strip and the controls use the free space underneath. */
+  #touch, #pauseBtn, #fsBtn { display: none; }
+  body.touch #stage { position: fixed; left: 0; top: 0; width: 100vw; height: calc(100 * var(--vh));
+                      --u: calc(var(--sw) / 100); background: linear-gradient(#000 50%, #170628); }
+  body.touch #view { inset: 0 auto auto 50%; width: var(--sw); height: calc(var(--sw) * .5625); transform: translateX(-50%); }
+  body.touch #keys { display: none; }
+  body.touch #keysTouch { display: grid; }
+  body.touch #startBtn { padding: calc(1.4 * var(--u)) calc(5 * var(--u)); }
+
+  body.touch #touch { display: block; position: absolute; inset: 0; visibility: hidden;
+                      --b: min(17vmin, 84px); --s: min(30vmin, 150px); }
+  body.touch #touch.on { visibility: visible; }
+  #stickZone { position: absolute; left: 0; bottom: 0; top: 40%; width: 46%; touch-action: none; }
+  #stickBase { position: absolute; left: calc(env(safe-area-inset-left, 0px) + 21vmin); top: calc(100% - 21vmin);
+               width: var(--s); height: var(--s); transform: translate(-50%, -50%); border-radius: 50%;
+               border: 2px solid rgba(124,245,255,.5); background: rgba(124,245,255,.07); opacity: .7; pointer-events: none; }
+  #stickBase.held { opacity: 1; background: rgba(124,245,255,.13); }
+  #stickKnob { position: absolute; left: 28%; top: 28%; width: 44%; height: 44%; border-radius: 50%;
+               background: rgba(124,245,255,.55); box-shadow: 0 0 12px rgba(0,229,255,.7); }
+  #pad { position: absolute; right: calc(env(safe-area-inset-right, 0px) + 3vmin);
+         bottom: calc(env(safe-area-inset-bottom, 0px) + 4vmin);
+         display: grid; grid-template-columns: repeat(3, var(--b)); gap: calc(var(--b) * .14); }
+  .tb { width: var(--b); height: var(--b); border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        border: 2px solid var(--c); color: var(--c); background: rgba(10,0,25,.5); box-shadow: 0 0 10px rgba(0,0,0,.6);
+        font-size: calc(var(--b) * .19); font-weight: 900; letter-spacing: .05em; touch-action: none; opacity: .85; }
+  .tb.down { background: var(--c); color: #12002a; transform: scale(.92); opacity: 1; }
+  #tbJump { grid-column: 2; }
+  #tbGrab { opacity: .4; }
+  #tbGrab.ready { opacity: 1; animation: grabPulse .45s steps(2) infinite; }
+  @keyframes grabPulse { 50% { background: var(--c); color: #12002a; } }
+  .sb { position: absolute; width: min(11vmin, 48px); height: min(11vmin, 48px); align-items: center; justify-content: center;
+        border-radius: 22%; border: 2px solid rgba(255,255,255,.6); background: rgba(10,0,25,.55); opacity: .8; touch-action: none; }
+  .sb svg { width: 52%; height: 52%; fill: #fff; }
+  body.touch #pauseBtn.on { display: flex; left: calc(50% - var(--sw) / 2 + 2.5 * var(--u)); top: calc(13 * var(--u)); }
+  body.touch #fsBtn.on { display: flex; right: calc(env(safe-area-inset-right, 0px) + 2.5vmin);
+                         top: calc(env(safe-area-inset-top, 0px) + 2.5vmin); }
+
+  @media (orientation: portrait) {
+    body.touch #hud { --u: calc(var(--sw) * .015); }
+    body.touch #bossHud { top: calc(100% + 1.5 * var(--u)); }
+    /* menus are scaled up for legibility, but never past what fits the screen height */
+    body.touch #overlay { --u: min(calc(var(--sw) * .022), calc(1.12 * var(--vh))); padding: 0 4vw; gap: calc(2 * var(--u)); }
+    body.touch #ovRow { flex-direction: column; gap: calc(2 * var(--u)); }
+    body.touch #stickZone { top: calc(var(--sw) * .5625 + 12vmin); width: 50%; }
+    body.touch #stickBase { top: calc(100% - 9 * var(--vh) - 19vmin); }
+    body.touch #pad { bottom: calc(env(safe-area-inset-bottom, 0px) + 9 * var(--vh)); }
+    body.touch #fsBtn.on { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 2.5vmin); }
+    body.touch #pauseBtn.on { left: auto; right: 4vmin; top: calc(var(--sw) * .5625 + 11 * var(--u)); }
+  }
 </style>
 </head>
 <body>
 <div id="stage">
+  <div id="view">
   <canvas id="game" width="800" height="450"></canvas>
 
   <div id="hud" class="hidden">
@@ -133,6 +199,20 @@
     <div id="prompt"></div>
   </div>
 
+  </div><!-- /#view -->
+
+  <!-- On-screen controls, only shown on touch devices while playing -->
+  <div id="touch">
+    <div id="stickZone"><div id="stickBase"><div id="stickKnob"></div></div></div>
+    <div id="pad">
+      <div class="tb" id="tbGrab"  data-key="KeyE"  style="--c:#c77dff">GRAB</div>
+      <div class="tb" id="tbBlock" data-key="KeyL"  style="--c:#7cf5ff">BLOCK</div>
+      <div class="tb" id="tbKick"  data-key="KeyK"  style="--c:#ff4d6d">KICK</div>
+      <div class="tb" id="tbJump"  data-key="Space" style="--c:#7cff6b">JUMP</div>
+      <div class="tb" id="tbPunch" data-key="KeyJ"  style="--c:#ffe45e">PUNCH</div>
+    </div>
+  </div>
+
   <div id="overlay">
     <div id="ovTitle">NEON ALLEY BRAWL</div>
     <div id="ovSub">Fight through The Streets and The Warehouse, then take down The Overseer.
@@ -141,6 +221,15 @@ Smash crates for food and weapons.</div>
     <div id="nameEntry"><label for="nameInput">ENTER YOUR NAME</label>
       <input id="nameInput" type="text" maxlength="3" value="AAA" autocomplete="off" spellcheck="false"></div>
     <div id="ovRow">
+    <div id="help">
+    <div id="keysTouch">
+      <span><b>Left thumb</b></span><span>Drag anywhere to move</span>
+      <span><b>PUNCH</b></span><span>Light attack (tap x3 for combo)</span>
+      <span><b>KICK</b></span><span>Heavy attack (knockdown)</span>
+      <span><b>BLOCK</b></span><span>Hold, facing the attacker</span>
+      <span><b>JUMP</b></span><span>+ PUNCH / KICK = flying kick</span>
+      <span><b>GRAB</b></span><span>Pick up weapon (pipe / bat)</span>
+    </div>
     <div id="keys">
       <span><b>WASD / Arrows</b></span><span>Move (left/right + depth)</span>
       <span><b>J</b></span><span>Light attack (tap x3 for combo)</span>
@@ -150,10 +239,14 @@ Smash crates for food and weapons.</div>
       <span><b>E</b></span><span>Pick up weapon (pipe / bat)</span>
       <span><b>P</b></span><span>Pause</span>
     </div>
+    </div><!-- /#help -->
     <div id="board"></div>
     </div>
     <button id="startBtn">START GAME</button>
   </div>
+
+  <div class="sb" id="pauseBtn" aria-label="Pause"><svg viewBox="0 0 20 20"><rect x="3" y="2" width="5" height="16"/><rect x="12" y="2" width="5" height="16"/></svg></div>
+  <div class="sb" id="fsBtn" aria-label="Fullscreen"><svg viewBox="0 0 20 20"><path d="M1 1h7v3H4v4H1zM12 1h7v7h-3V4h-4zM1 12h3v4h4v3H1zM16 12h3v7h-7v-3h4z"/></svg></div>
 </div>
 
 <script>
@@ -490,9 +583,113 @@ const Input = {
     addEventListener('keyup', e => this.down.delete(e.code));
     addEventListener('blur', () => { this.down.clear(); this.edge.clear(); });
   },
+  /* Touch controls feed the same key codes; a press only counts as an edge once. */
+  virtual(code, on) {
+    if (!on) this.down.delete(code);
+    else if (!this.down.has(code)) { this.down.add(code); this.edge.add(code); }
+  },
   held(a) { return this.MAP[a].some(k => this.down.has(k)); },
   pressed(a) { return this.MAP[a].some(k => this.edge.has(k)); },   // true once per press
   endStep() { this.edge.clear(); }                                  // called after each physics step
+};
+
+/* ---------- 3b. TouchPad ---------------------------------------------------- */
+/* On-screen controls for phones and tablets. A floating 8-way stick on the left
+   (it appears under the thumb and follows it) and action buttons on the right.
+   Everything is translated into the keyboard codes of Input.MAP, so gameplay code
+   does not know the difference. Enabled when the primary pointer is coarse, or on
+   the first touch on hybrid devices. */
+const TouchPad = {
+  enabled: false, active: null, game: null, stickId: null, ox: 0, oy: 0, zr: null,
+  DIRS: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'],
+  init(game) {
+    this.game = game;
+    this.el = $('touch'); this.zone = $('stickZone'); this.base = $('stickBase'); this.knob = $('stickKnob');
+    this.grab = $('tbGrab'); this.pause = $('pauseBtn'); this.fs = $('fsBtn');
+    this.buttons = [...this.el.querySelectorAll('[data-key]')];
+
+    for (const b of this.buttons) {
+      const set = on => { Input.virtual(b.dataset.key, on); b.classList.toggle('down', on); };
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault(); set(true);
+        try { b.setPointerCapture(e.pointerId); } catch (err) { /* capture is best-effort */ }
+      });
+      for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, () => set(false));
+    }
+
+    this.zone.addEventListener('pointerdown', e => {
+      if (this.stickId !== null) return;
+      e.preventDefault();
+      this.stickId = e.pointerId; this.zr = this.zone.getBoundingClientRect();
+      try { this.zone.setPointerCapture(e.pointerId); } catch (err) { /* best-effort */ }
+      this.ox = e.clientX; this.oy = e.clientY;
+      this.base.classList.add('held');
+      this.moveStick(e);
+    });
+    this.zone.addEventListener('pointermove', e => { if (e.pointerId === this.stickId) this.moveStick(e); });
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture'])
+      this.zone.addEventListener(ev, e => { if (e.pointerId === this.stickId) this.releaseStick(); });
+
+    this.pause.addEventListener('pointerdown', e => { e.preventDefault(); if (game.mode === 'playing') game.togglePause(); });
+    this.fs.addEventListener('click', () => this.toggleFullscreen());
+    addEventListener('contextmenu', e => { if (this.enabled) e.preventDefault(); });   // no long-press menu
+
+    if (window.matchMedia && matchMedia('(pointer: coarse)').matches) this.enable();
+    else addEventListener('touchstart', () => this.enable(), { once: true, passive: true });
+  },
+  enable() {
+    if (this.enabled) return;
+    this.enabled = true;
+    document.body.classList.add('touch');
+    dispatchEvent(new Event('resize'));          // the play field changed size: rebuild the canvas backing store
+  },
+  moveStick(e) {
+    const R = this.base.offsetWidth / 2 || 50;
+    let dx = e.clientX - this.ox, dy = e.clientY - this.oy;
+    const d = Math.hypot(dx, dy);
+    if (d > R) {                                 // drag the base along so reversing direction is instant
+      const k = (d - R) / d;
+      this.ox += dx * k; this.oy += dy * k; dx -= dx * k; dy -= dy * k;
+    }
+    this.base.style.left = (this.ox - this.zr.left) + 'px'; this.base.style.top = (this.oy - this.zr.top) + 'px';
+    this.knob.style.transform = `translate(${dx * 0.6}px, ${dy * 0.6}px)`;
+    // 8-way: an axis counts once it is past the dead zone and inside its 45-degree sector.
+    const dead = R * 0.28, ax = Math.abs(dx), ay = Math.abs(dy), on = Math.max(ax, ay) > dead;
+    const h = on && ax > ay * 0.414, v = on && ay > ax * 0.414;
+    Input.virtual('ArrowLeft', h && dx < 0); Input.virtual('ArrowRight', h && dx > 0);
+    Input.virtual('ArrowUp', v && dy < 0);   Input.virtual('ArrowDown', v && dy > 0);
+  },
+  releaseStick() {
+    this.stickId = null;
+    for (const c of this.DIRS) Input.virtual(c, false);
+    this.base.classList.remove('held');
+    this.base.style.left = this.base.style.top = ''; this.knob.style.transform = '';   // back to the resting spot
+  },
+  releaseAll() {
+    this.releaseStick();
+    for (const b of this.buttons) { Input.virtual(b.dataset.key, false); b.classList.remove('down'); }
+  },
+  toggleFullscreen() {
+    const d = document, el = d.documentElement;
+    try {
+      if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+      else { const r = (el.requestFullscreen || el.webkitRequestFullscreen).call(el); if (r && r.catch) r.catch(() => {}); }
+    } catch (err) { /* fullscreen is optional */ }
+  },
+  /* Called every frame: controls are only live while playing, and nothing stays held across a pause. */
+  sync() {
+    if (!this.enabled) return;
+    const g = this.game, on = g.mode === 'playing';
+    if (on !== this.active) {
+      this.active = on;
+      this.el.classList.toggle('on', on); this.pause.classList.toggle('on', on);
+      const canFs = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+      this.fs.classList.toggle('on', !on && !!canFs);
+      if (!on) this.releaseAll();
+    }
+    const ready = on && !!g.nearWeapon;
+    if (ready !== this.grabReady) { this.grabReady = ready; this.grab.classList.toggle('ready', ready); }
+  }
 };
 
 /* ---------- 4. Attack data -------------------------------------------------- */
@@ -1450,7 +1647,7 @@ class Renderer {
       c.fillStyle = '#ffe45e'; c.strokeStyle = '#1a0b2e'; c.lineWidth = 2;
       c.beginPath(); c.roundRect(sx - 10, by, 20, 20, 4); c.fill(); c.stroke();
       c.fillStyle = '#1a0b2e'; c.font = '900 14px "Trebuchet MS", sans-serif'; c.textAlign = 'center';
-      c.fillText('E', sx, by + 15);
+      c.fillText(TouchPad.enabled ? '+' : 'E', sx, by + 15);
     }
   }
 
@@ -1755,7 +1952,7 @@ class Game {
                 enemies: $('enemies'), combo: $('combo'), comboNum: $('comboNum'), go: $('go'), diff: $('diff'),
                 weapon: $('weapon'), prompt: $('prompt'), nameEntry: $('nameEntry'), nameInput: $('nameInput'),
                 board: $('board'), bossHud: $('bossHud'), bossFill: $('bossFill'), bossGhost: $('bossGhost'), stats: $('ovStats'),
-                overlay: $('overlay'), title: $('ovTitle'), sub: $('ovSub'), keys: $('keys'), btn: $('startBtn') };
+                overlay: $('overlay'), title: $('ovTitle'), sub: $('ovSub'), keys: $('help'), btn: $('startBtn') };
     this.uiCache = {};
     this.mode = 'title';                // title | playing | paused | over
     this.acc = 0; this.last = 0;
@@ -1823,7 +2020,7 @@ class Game {
     const pausing = this.mode === 'playing';
     this.mode = pausing ? 'paused' : 'playing';
     this.audio.setPaused(pausing);
-    if (pausing) this.showOverlay('PAUSED', 'Press P or the button to resume.', 'RESUME');
+    if (pausing) this.showOverlay('PAUSED', TouchPad.enabled ? 'Tap the button to resume.' : 'Press P or the button to resume.', 'RESUME');
     else this.ui.overlay.classList.add('hidden');
   }
 
@@ -1849,6 +2046,7 @@ class Game {
       this.acc += dt;
       while (this.acc >= STEP) { this.update(STEP); this.acc -= STEP; }
     }
+    TouchPad.sync();
     this.renderer.draw(this);
     requestAnimationFrame(t => this.frame(t));
   }
@@ -2061,7 +2259,8 @@ class Game {
     const inp = this.ui.nameInput;
     inp.value = Leaderboard.lastName;
     this.ui.nameEntry.classList.add('show');
-    try { inp.focus(); inp.select(); } catch (err) { /* focus is best-effort */ }
+    // On phones the name field is not auto-focused: the soft keyboard would cover the results.
+    if (!TouchPad.enabled) try { inp.focus(); inp.select(); } catch (err) { /* focus is best-effort */ }
   }
 
   submitScore() {
@@ -2071,8 +2270,9 @@ class Game {
                                               time: Math.round(this.finalTime * 10) / 10 });
     this.ui.nameEntry.classList.remove('show');
     try { this.ui.nameInput.blur(); } catch (err) { /* ignore */ }
-    this.ui.sub.textContent = rank >= 0 ? `NEW HIGH SCORE! RANK #${rank + 1}\nPress Enter or the button to play again.`
-                                        : 'Not in the top 5 this time.\nPress Enter or the button to try again.';
+    const how = TouchPad.enabled ? 'Tap the button' : 'Press Enter or the button';
+    this.ui.sub.textContent = rank >= 0 ? `NEW HIGH SCORE! RANK #${rank + 1}\n${how} to play again.`
+                                        : `Not in the top 5 this time.\n${how} to try again.`;
     this.ui.btn.textContent = 'PLAY AGAIN';
     this.renderBoard(list, rank);
     this.audio.jingle(rank >= 0 ? [660, 880, 1320] : [440, 330]);
@@ -2251,7 +2451,7 @@ class Game {
     });
     this.setUi('weaponLow', !!W && dur <= 3, v => u.weapon.classList.toggle('low', v));
     const nw = this.nearWeapon;
-    this.setUi('prompt', nw ? `PRESS E TO ${p.hasWeapon ? 'SWAP FOR' : 'PICK UP'} ${WEAPONS[nw.type].name}` : '', v => {
+    this.setUi('prompt', nw ? `${TouchPad.enabled ? 'TAP GRAB' : 'PRESS E'} TO ${p.hasWeapon ? 'SWAP FOR' : 'PICK UP'} ${WEAPONS[nw.type].name}` : '', v => {
       u.prompt.textContent = v; u.prompt.classList.toggle('show', !!v);
     });
     const left = this.enemies.length + this.pending.length;
@@ -2275,6 +2475,7 @@ class Game {
 /* ---------- Boot ------------------------------------------------------------- */
 Input.init();
 window.game = new Game();
+TouchPad.init(window.game);
 </script>
 </body>
 </html>
